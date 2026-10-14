@@ -1,0 +1,3 @@
+experiment_id,mpi_ranks,threads,processes,data_rows,repeat,serial_time_seconds,parallel_time_seconds,speedup,efficiency_percent,efficiency_total_percent,rows_processed,missing_values_before,missing_values_filled,status
+E1_baseline_serial,1,1,1,1820,1,0.005661,0.126548,0.0447,4.47,4.47,1820,1057,1057,success
+E1_baseline_serial,1,1,1,1820,2,0.005134,0.127077,0.0404,4.04,4.04,1820,1057,1057,success

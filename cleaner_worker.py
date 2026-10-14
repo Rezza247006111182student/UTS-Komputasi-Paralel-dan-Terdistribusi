@@ -14,10 +14,23 @@
 # ini ke file sendiri yang bersih dari mpi4py, proses worker cukup
 # mengimpor file kecil ini saja tanpa memicu MPI_Init() ulang.
 
+
 def bersihkan_subchunk(args):
     """Level 2 (CPU-bound): bersihkan satu sub-chunk baris.
-    Dijalankan di proses terpisah (ProcessPoolExecutor)."""
+    Dijalankan di proses terpisah (ProcessPoolExecutor).
+
+    Rata-rata dihitung dari data yang ada (non-kosong) di dalam sub-chunk
+    yang diterima. Nilai kosong diisi dengan rata-rata sub-chunk tersebut.
+    Pendekatan ini menyebabkan nilai imputasi bisa sedikit berbeda antar
+    sub-chunk (karena rata-rata dihitung dari subset berbeda), namun
+    di level atas hasilnya digabung menjadi weighted mean global.
+    Untuk keperluan eksperimen benchmark, pendekatan ini sudah memadai.
+    """
     header, rows, kolom_numerik = args
+
+    # Pastikan rows tidak kosong
+    if not rows:
+        return [], {k: 0.0 for k in kolom_numerik}, {k: 0 for k in kolom_numerik}, 0
 
     idx_kolom = {nama: header.index(nama) for nama in kolom_numerik}
 
@@ -25,10 +38,13 @@ def bersihkan_subchunk(args):
     count = {k: 0 for k in kolom_numerik}
     for row in rows:
         for k, i in idx_kolom.items():
-            val = row[i]
+            val = row[i].strip() if i < len(row) else ""
             if val != "":
-                jumlah[k] += float(val)
-                count[k] += 1
+                try:
+                    jumlah[k] += float(val)
+                    count[k] += 1
+                except ValueError:
+                    pass  # abaikan nilai non-numerik
     rata2 = {k: (jumlah[k] / count[k] if count[k] > 0 else 0.0) for k in kolom_numerik}
 
     missing_terisi = 0
@@ -36,9 +52,11 @@ def bersihkan_subchunk(args):
     for row in rows:
         new_row = list(row)
         for k, i in idx_kolom.items():
-            if new_row[i] == "":
-                new_row[i] = f"{rata2[k]:.2f}"
-                missing_terisi += 1
+            if i < len(new_row):
+                val = new_row[i].strip()
+                if val == "":
+                    new_row[i] = f"{rata2[k]:.2f}"
+                    missing_terisi += 1
         cleaned_rows.append(new_row)
 
     return cleaned_rows, rata2, count, missing_terisi
